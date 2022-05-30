@@ -44,6 +44,7 @@ workflow MARK_DUPLICATES_PICARD {
 
     emit:
     bam      = PICARD_MARKDUPLICATES.out.bam     // channel: [ val(meta), [ bam ] ]
+    bam_bai  = ch_bam_bai                        // channel: [ val(meta), [ bam, bai ] ]
     metrics  = PICARD_MARKDUPLICATES.out.metrics // channel: [ val(meta), [ metrics ] ]
 
     bai      = SAMTOOLS_INDEX.out.bai            // channel: [ val(meta), [ bai ] ]

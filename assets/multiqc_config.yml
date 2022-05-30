@@ -168,3 +168,12 @@ custom_data:
       table_title: "Samples failed strandedness check"
       namespace: "Samples failed strandedness check"
       format: "{:.2f}"
+  # qtltools_mbv:
+  #   section_name: "QTLtools mbv: Match bam with vcf file samples"
+  #   description: "QTLtools mbv imports genetic variation from vcf files, and then measures the similarity with a specified bam file's variation."
+  #   plot_type: "heatmap"
+  #   pconfig:
+  #     id: 'QTLtools_mbv'
+  #     title: 'Similarity of bam sample with vcf sample'
+  #     min: 0
+  #     max: 1

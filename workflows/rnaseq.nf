@@ -21,8 +21,10 @@ checkPathParamList = [
     params.fasta, params.transcript_fasta, params.additional_fasta,
     params.gtf, params.gff, params.gene_bed,
     params.ribo_database_manifest, params.splicesites,
-    params.star_index, params.hisat2_index, params.rsem_index, params.salmon_index
+    params.star_index, params.hisat2_index, params.rsem_index, params.salmon_index,
+    params.vcf
 ]
+
 for (param in checkPathParamList) { if (param) { file(param, checkIfExists: true) } }
 
 // Check mandatory parameters
@@ -38,6 +40,15 @@ if (params.remove_ribo_rna) {
 if (!params.skip_bbsplit && !params.bbsplit_index && params.bbsplit_fasta_list) {
     ch_bbsplit_fasta_list = file(params.bbsplit_fasta_list, checkIfExists: true)
     if (ch_bbsplit_fasta_list.isEmpty()) {exit 1, "File provided with --bbsplit_fasta_list is empty: ${ch_bbsplit_fasta_list.getName()}!"}
+}
+
+// Check to make sure that vcf file was provided if match_bam_to_sample was selected
+if (params.match_bam_to_sample && !params.vcf) {exit 1, "Option to check rna reads against vcf is selected, but no vcf file was specified!"}
+
+// Check if genotype vcf is provided when running qtltools' mbv function
+if (params.match_bam_to_sample && params.vcf) {
+    ch_vcf = file(params.vcf, checkIfExists: true)
+    if (ch_vcf.isEmpty()) {exit 1, "Option to check rna reads against vcf is selected, but specified vcf file is empty or does not exist: ${vcf_file.getName()}!"}
 }
 
 // Check alignment parameters
@@ -103,6 +114,7 @@ include { DESEQ2_QC as DESEQ2_QC_STAR_SALMON } from '../modules/local/deseq2_qc'
 include { DESEQ2_QC as DESEQ2_QC_RSEM        } from '../modules/local/deseq2_qc'
 include { DESEQ2_QC as DESEQ2_QC_SALMON      } from '../modules/local/deseq2_qc'
 include { DUPRADAR                           } from '../modules/local/dupradar'
+include { QTLTOOLS_MBV                       } from '../modules/local/qtltools_mbv'
 include { MULTIQC                            } from '../modules/local/multiqc'
 include { MULTIQC_CUSTOM_BIOTYPE             } from '../modules/local/multiqc_custom_biotype'
 include { MULTIQC_TSV_FROM_LIST as MULTIQC_TSV_FAIL_MAPPED  } from '../modules/local/multiqc_tsv_from_list'
@@ -112,10 +124,11 @@ include { MULTIQC_TSV_FROM_LIST as MULTIQC_TSV_STRAND_CHECK } from '../modules/l
 //
 // SUBWORKFLOW: Consisting of a mix of local and nf-core/modules
 //
-include { INPUT_CHECK    } from '../subworkflows/local/input_check'
-include { PREPARE_GENOME } from '../subworkflows/local/prepare_genome'
-include { ALIGN_STAR     } from '../subworkflows/local/align_star'
-include { QUANTIFY_RSEM  } from '../subworkflows/local/quantify_rsem'
+include { INPUT_CHECK         } from '../subworkflows/local/input_check'
+include { PREPARE_GENOME      } from '../subworkflows/local/prepare_genome'
+include { ALIGN_STAR          } from '../subworkflows/local/align_star'
+include { QUANTIFY_RSEM       } from '../subworkflows/local/quantify_rsem'
+include { QUANTIFY_LEAFCUTTER } from '../subworkflows/local/quantify_leafcutter'
 include { QUANTIFY_SALMON as QUANTIFY_STAR_SALMON } from '../subworkflows/local/quantify_salmon'
 include { QUANTIFY_SALMON as QUANTIFY_SALMON      } from '../subworkflows/local/quantify_salmon'
 
@@ -587,6 +600,16 @@ workflow RNASEQ {
     }
 
     //
+    // SUBWORKFLOW: LEAFCUTTER
+    //
+    if (!params.skip_alignment && !params.skip_leafcutter) {
+        QUANTIFY_LEAFCUTTER (
+            ch_genome_bam.join(ch_genome_bam_index, by: [0])
+        )
+        ch_versions = ch_versions.mix(QUANTIFY_LEAFCUTTER.out.versions.first())
+    }
+
+    //
     // MODULE: Feature biotype QC using featureCounts
     //
     ch_featurecounts_multiqc = Channel.empty()
@@ -658,6 +681,7 @@ workflow RNASEQ {
     ch_readduplication_multiqc    = Channel.empty()
     ch_fail_strand_multiqc        = Channel.empty()
     ch_tin_multiqc                = Channel.empty()
+    ch_qtltools_mbv_multiqc       = Channel.empty()
     if (!params.skip_alignment && !params.skip_qc) {
         if (!params.skip_qualimap) {
             QUALIMAP_RNASEQ (
@@ -675,6 +699,15 @@ workflow RNASEQ {
             )
             ch_dupradar_multiqc = DUPRADAR.out.multiqc
             ch_versions = ch_versions.mix(DUPRADAR.out.versions.first())
+        }
+
+        if (params.match_bam_to_sample && params.vcf) {
+            QTLTOOLS_MBV (
+                ch_genome_bam.join(ch_genome_bam_index, by: [0]),
+                ch_vcf
+            )
+            ch_qtltools_mbv_multiqc = QTLTOOLS_MBV.out.mbv_multiqc
+            ch_versions = ch_versions.mix(QTLTOOLS_MBV.out.versions.first())
         }
 
         if (!params.skip_rseqc && rseqc_modules.size() > 0) {
@@ -798,7 +831,8 @@ workflow RNASEQ {
             ch_junctionsaturation_multiqc.collect{it[1]}.ifEmpty([]),
             ch_readdistribution_multiqc.collect{it[1]}.ifEmpty([]),
             ch_readduplication_multiqc.collect{it[1]}.ifEmpty([]),
-            ch_tin_multiqc.collect{it[1]}.ifEmpty([])
+            ch_tin_multiqc.collect{it[1]}.ifEmpty([]),
+            ch_qtltools_mbv_multiqc.collect{it[1]}.ifEmpty([])
         )
         multiqc_report = MULTIQC.out.report.toList()
     }
