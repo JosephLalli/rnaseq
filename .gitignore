@@ -6,3 +6,5 @@ results/
 testing/
 testing*
 *.pyc
+het_heatmap.svg
+hom_heatmap.svg

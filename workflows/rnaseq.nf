@@ -43,10 +43,10 @@ if (!params.skip_bbsplit && !params.bbsplit_index && params.bbsplit_fasta_list) 
 }
 
 // Check to make sure that vcf file was provided if match_bam_to_sample was selected
-if (params.match_bam_to_sample && !params.vcf) {exit 1, "Option to check rna reads against vcf is selected, but no vcf file was specified!"}
+if ( !params.skip_mbv && !params.vcf ) {exit 1, "Option to check rna reads against vcf is selected, but no vcf file was specified!"}
 
 // Check if genotype vcf is provided when running qtltools' mbv function
-if (params.match_bam_to_sample && params.vcf) {
+if (!params.skip_mbv && params.vcf) {
     ch_vcf = file(params.vcf, checkIfExists: true)
     if (ch_vcf.isEmpty()) {exit 1, "Option to check rna reads against vcf is selected, but specified vcf file is empty or does not exist: ${vcf_file.getName()}!"}
 }
@@ -701,7 +701,7 @@ workflow RNASEQ {
             ch_versions = ch_versions.mix(DUPRADAR.out.versions.first())
         }
 
-        if (params.match_bam_to_sample && params.vcf) {
+        if (!params.skip_mbv && params.vcf) {
             QTLTOOLS_MBV (
                 ch_genome_bam.join(ch_genome_bam_index, by: [0]),
                 ch_vcf

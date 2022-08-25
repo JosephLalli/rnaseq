@@ -1,6 +1,6 @@
 process REGTOOLS_BAMTOJUNC {
     tag "$meta.id"
-    label 'process_medium'
+    label 'process_low'
 
     conda (params.enable_conda ? "bioconda::regtools=0.6.1" : null)
     container "${ workflow.containerEngine == 'singularity' && !task.ext.singularity_pull_docker_container ?
@@ -11,7 +11,8 @@ process REGTOOLS_BAMTOJUNC {
     tuple val(meta), path(bam), path(bai)
 
     output:
-    path("*.leafcutter.junc"), emit: junctions
+    // val(meta), path ("*.junc"), emit: junctions
+    path ("*.junc"), emit: junctions
     path "versions.yml"           , emit: versions
     
     when:
@@ -31,7 +32,7 @@ process REGTOOLS_BAMTOJUNC {
         -s $strandedness \\
         -a 8 \\
         $bam \\
-        -o ${meta.id}.leafcutter.junc
+        -o ${prefix}.junc
 
     cat <<-END_VERSIONS > versions.yml
     "${task.process}":

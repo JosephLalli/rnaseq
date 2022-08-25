@@ -14,7 +14,7 @@ import shutil
 __version__ = '0.2.7'
 
 def main(options, libl):
-
+    print (libl)
     if options.cluster is None:
         pool_junc_reads(libl, options)
         refine_clusters(options)
